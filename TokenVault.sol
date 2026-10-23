@@ -87,6 +87,11 @@ contract TokenVault is Recoverable {
     _;
   }
 
+  modifier vestingPassed() {
+    require(block.timestamp >= lockedAt.add(vestingPeriod), "Lock up must be over");
+    _;
+  }
+
 
   /**
    * @notice Creates a TokenVault contract that stores a token distribution.
@@ -100,9 +105,11 @@ contract TokenVault is Recoverable {
   constructor(
     ERC20Basic _token,
     uint256 _tokensToBeAllocated,
-    uint256 _vestingPeriod
+    uint256 _vestingPeriod,
+    address[] _owners,
+    uint256 _required
   )
-    public
+    public Multiownable(_owners, _required)
   {
     require(address(_token) != address(0), "Token address should not be blank");
     require(_tokensToBeAllocated > 0, "Token allocation should be greater than zero");
@@ -125,8 +132,8 @@ contract TokenVault is Recoverable {
     uint256 _amount
   )
     external
-    onlyOwner
     vaultLoading
+    onlyManyOwners 
     returns(bool)
   {
     require(_beneficiary != address(0), "Beneficiary of allocation must not be blank");
@@ -147,7 +154,7 @@ contract TokenVault is Recoverable {
    * @dev Should be called after every allocation has been set.
    * @return true if the vault has been successfully locked
    */
-  function lock() external onlyOwner vaultLoading {
+  function lock() external vaultLoading onlyManyOwners {
     require(tokensAllocated == tokensToBeAllocated, "Expected to allocate all tokens");
     require(token.balanceOf(address(this)) == tokensAllocated, "Vault must own enough tokens to distribute");
 
@@ -162,7 +169,7 @@ contract TokenVault is Recoverable {
    * beneficiaries.
    * @dev Must be locked prior to unlocking. Also, the vestingPeriod must be up.
    */
-  function unlock() external onlyOwner vaultLocked {
+  function unlock() external vaultLocked vestingPassed onlyManyOwners {
     require(unlockedAt == 0, "Must not be unlocked yet");
     // solium-disable-next-line security/no-block-members
     require(block.timestamp >= lockedAt.add(vestingPeriod), "Lock up must be over");
@@ -194,8 +201,8 @@ contract TokenVault is Recoverable {
     address _beneficiary
   )
     public
-    onlyOwner
-    vaultUnlocked
+    vaultUnlocked 
+    onlyManyOwners 
     returns(bool)
   {
     return _transferTokens(_beneficiary);

@@ -32,11 +32,23 @@ contract XeloraCoin is PausableToken, UpgradeableToken {
     * @notice XeloraCoin (ERC20 Token) contract constructor.
     * @dev Assigns all tokens to contract creator.
     */
-  constructor() public {
-    totalSupply_ = INITIAL_SUPPLY;
-    balances[msg.sender] = INITIAL_SUPPLY;
-    emit Transfer(0x0, msg.sender, INITIAL_SUPPLY);
-  }
+constructor(address[] _owners, uint256 _required) public Multiownable(_owners, _required) {
+  totalSupply_ = INITIAL_SUPPLY;
+  balances[msg.sender] = INITIAL_SUPPLY;
+  emit Transfer(0x0, msg.sender, INITIAL_SUPPLY);
+}
+
+
+// Overrides. super.pause() would fail because it checks the old `owner`, so re-implement the body.
+function pause() onlyManyOwners whenNotPaused public {
+  paused = true;
+  emit Pause();
+}
+
+function unpause() onlyManyOwners whenPaused public {
+  paused = false;
+  emit Unpause();
+}
 
   /**
    * @dev Allow UpgradeableToken functionality only if contract is not paused.

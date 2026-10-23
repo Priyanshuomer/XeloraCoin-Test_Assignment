@@ -2,7 +2,7 @@ pragma solidity 0.4.23;
 
 import "../zeppelin/contracts/ownership/CanReclaimToken.sol";
 import "../zeppelin/contracts/ownership/Claimable.sol";
-
+import "./Multiownable.sol";
 
 /**
  * @title Recoverable ensures ether and ERC20 tokens can be claimed by the
@@ -11,14 +11,23 @@ import "../zeppelin/contracts/ownership/Claimable.sol";
  * @dev Prevents accidental loss of tokens and ether erroneously sent to
  * this contract
  */
-contract Recoverable is CanReclaimToken, Claimable {
+
+contract Recoverable is CanReclaimToken, Claimable, Multiownable {
   using SafeERC20 for ERC20Basic;
 
-  /**
-   * @dev Transfer all ether held by the contract to the contract owner.
-   */
-  function reclaimEther() external onlyOwner {
-    owner.transfer(address(this).balance);
+  // Destination is a parameter so ALL owners approve the same address (it's part of msg.data).
+  function reclaimEtherTo(address _to) external onlyManyOwners {
+    require(_to != address(0));
+    _to.transfer(address(this).balance);
   }
 
+  function reclaimTokenTo(ERC20Basic _token, address _to) external onlyManyOwners {
+    require(_to != address(0));
+    _token.safeTransfer(_to, _token.balanceOf(address(this)));
+  }
+
+  // Disable the old single-owner paths
+  function reclaimToken(ERC20Basic) external { revert("Use reclaimTokenTo"); }
+  function transferOwnership(address) public { revert("Ownership is multi-owner"); }
+  function claimOwnership() public { revert("Ownership is multi-owner"); }
 }
